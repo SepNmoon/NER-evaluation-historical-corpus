@@ -11,7 +11,7 @@ import pandas as pd
 import os
 
 def read_file(file):
-    tree=ET.parse('D:\OneDrive - University College London\Desktop\Corpora\Sloane\'s Catalogue\%s'%file)
+    tree=ET.parse('../original datasets/Sloane/%s'%file)
     root=tree.getroot()   
     text_node=root.find('{http://www.tei-c.org/ns/1.0}text')
     body_node=text_node.find('{http://www.tei-c.org/ns/1.0}body')
@@ -26,50 +26,40 @@ def iterate_place_person(node):
             pers_str = ET.tostring(child, encoding='unicode')
             special_patterns=[r'&amp;',r'&apos;',r'&lt;',r'&gt;',r'&quot;'] 
             replace_patterns=['&','\'','<','>','"']
-            #将这种符号改掉&特殊符号
             for i in range(len(replace_patterns)):
                 pers_str=re.sub(special_patterns[i],replace_patterns[i],pers_str)
-            #print(pers_str)
             persName=''
             pattern=r'>(.*?)<'
             person_result=re.findall(pattern,pers_str,flags=re.S)
             
-            for i in person_result:  #将被tag分离的名字加起来
+            for i in person_result:  
                 i=i.replace('\n','')
                 persName=persName+i          
-                space_pattern=r'\s{1,}' #去掉换行后莫名奇妙的空格
+                space_pattern=r'\s{1,}'
                 persName=re.sub(space_pattern,' ',persName)
             
             all_persName.append(persName) 
-            #print(all_persName)
             
         elif child.tag=='{http://www.tei-c.org/ns/1.0}placeName':
             
             place_str = ET.tostring(child, encoding='unicode')
             special_patterns=[r'&amp;',r'&apos;',r'&lt;',r'&gt;',r'&quot;'] 
             replace_patterns=['&','\'','<','>','"']
-            #将这种符号改掉&特殊符号
             for i in range(len(replace_patterns)):
                 pers_str=re.sub(special_patterns[i],replace_patterns[i],place_str)
-            #print(place_str)
             placeName=''
             pattern=r'>(.*?)<'
             place_result=re.findall(pattern,place_str,flags=re.S)
-            #print(place_result)
             for i in place_result:
                 i=i.replace('\n','')
                 placeName=placeName+i
-                space_pattern=r'\s{1,}' #去掉换行后莫名奇妙的空格                
+                space_pattern=r'\s{1,}'             
                 placeName=re.sub(space_pattern,' ',placeName)
             all_placeName.append(placeName)
-            #print(all_placeName)
-            
-            
-            #print(child.text)
 
         else:
             iterate_place_person(child)
-    #print(all_persName)
+
 
 def match(node):
     body_str=ET.tostring(node, encoding='unicode')
@@ -79,7 +69,6 @@ def match(node):
     pers_replacements=[]
     for p in range(len(pers_matches)):
         pers_replacements.append('<ns0:persName>'+' persName '+'</ns0:persName>')
-    #将所有的persName的tag全换掉
     for match, replacement in zip(pers_matches, pers_replacements):
         body_str = body_str.replace(match, replacement, 1)
     
@@ -88,34 +77,29 @@ def match(node):
     pers_replacements=[]
     for p in range(len(pers_matches)):
         pers_replacements.append('<ns0:persName>'+' persName '+'</ns0:persName>')
-    #将所有的name的tag全换掉
     for match, replacement in zip(pers_matches, pers_replacements):
         body_str = body_str.replace(match, replacement, 1)
     
-    
-    #所有地名也
     place_pattern=r'<ns0:placeName.*?</ns0:placeName>'
     place_matches=re.findall(place_pattern,body_str,flags=re.S)
     
     place_replacements=[]
     for p in range(len(place_matches)):
         place_replacements.append('<ns0:placeName>'+' placeName '+'</ns0:placeName>')
-    #将所有的placeName的tag全换掉
     for match, replacement in zip(place_matches, place_replacements):
         body_str = body_str.replace(match, replacement, 1)
     
     special_patterns=['&amp;','&apos;','&lt;','&gt;','&quot;'] 
     replace_patterns=['&','\'','<','>','"']
-    #将这种符号改掉&特殊符号
+    
     for i in range(len(replace_patterns)):
         body_str=re.sub(special_patterns[i],replace_patterns[i],body_str)
 
-    group_pattern=r'>(.*?)<' #匹配><之间的东西
+    group_pattern=r'>(.*?)<' 
     group_result=re.findall(group_pattern,body_str,flags=re.S)
 
-    #print(group_result)
     new_group=[]
-    #去空值，只把有文本的留下
+    #remove null
     text=''
     for m in group_result:
         m=m.replace('\n',' ')
@@ -125,7 +109,6 @@ def match(node):
             new_group.append(m)
         text=text+m
     
-    #将persName换成真的
     pers_pattern=r'persName'
     pers_matches=re.findall(pers_pattern,text,flags=re.S)
     for match,replacement in zip(pers_matches, all_persName):
@@ -146,13 +129,10 @@ def token():
     tokens=word_tokenize(text)
     pers_index=0
     place_index=0
-    
-   
+     
     for t in tokens:
         if t=='persName':
             p_tokens=word_tokenize(all_persName[pers_index])
-            #print(all_persName[pers_index])
-            #print(pers_index)
             for p in p_tokens:
                 all_token.append(p)
             if len(p_tokens)==1:
@@ -177,38 +157,23 @@ def token():
             all_token.append(t)
             all_entity.append('O')
     
-
     return all_token,all_entity
-    
-
-    
+     
 def write_csv(file):
     all_token,all_entity=token()
     file=file.replace('.xml','.tsv')
     dataframe = pd.DataFrame({'TOKEN':all_token,'NE':all_entity})
-    dataframe.to_csv("D:\OneDrive - University College London\Desktop\check\%s"%file,index=False,sep='\t')   
-    
-    
-    
-    
-    
-
-
+    dataframe.to_csv("../evaluation datasets/Sloane_new/%s"%file,index=False,sep='\t')   
 
 if __name__ == "__main__":
-    path='D:\OneDrive - University College London\Desktop\Corpora\Sloane\'s Catalogue'   
+    path='../original datasets/Sloane'   
     files= os.listdir(path)
-    
-    
-    
-    for file in files[1:2]:
+    for file in files[0:2]:
         all_persName=[]
-        all_placeName=[]
-        
+        all_placeName=[]        
         body_node=read_file(file)
         iterate_place_person(body_node)
-        print(all_persName)
-        #write_csv(file)
+        write_csv(file)
     
     
     

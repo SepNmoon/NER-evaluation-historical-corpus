@@ -5,30 +5,24 @@ import pandas as pd
 import os
 
 def read_file(file):
-    
-    #print(files)
-    
-    tree=ET.parse('D:\OneDrive - University College London\Desktop\Corpora\MH\XML_files_minus_project-specific_mark-up_20240212\%s'%file)
+    tree=ET.parse('../original datasets/XML_files_minus_project-specific_mark-up_20240212/%s'%file)
     root=tree.getroot()
     text_node=root.find('{http://www.tei-c.org/ns/1.0}text')
-    
-    
     return text_node
 
-
 def iterate_place_person(node):
-#提取所有的persName和placeName
+    #extract all the persName and placeName
     global all_persName
     global all_placeName
     
     for child in node:
         if child.tag=='{http://www.tei-c.org/ns/1.0}persName':
             pers_str = ET.tostring(child, encoding='unicode')
-            #检查是否有sic
+            #check if <sic> exists
             sic_str=r'<ns0:sic.*?>'
             sic_result=re.search(sic_str,pers_str,flags=re.DOTALL)
             if sic_result!=None:
-                #如果有sic，则去掉更正过的标注，保留错误de
+                #if <sic> exists, remove <corr>
                 name_str=re.sub(r'<ns0:corr>.*?</ns0:corr>','',pers_str,flags=re.DOTALL) 
             else:
                 name_str=pers_str
@@ -36,7 +30,7 @@ def iterate_place_person(node):
             expan_str=r'<ns0:expan.*?>'            
             expan_result=re.search(expan_str,name_str,flags=re.DOTALL)
             if expan_result!=None:
-                #如果有扩展的，则去掉扩展，保留原来的缩写
+                #if <expan> exists, remore <expan>
                 name_str=re.sub(r'<ns0:expan>.*?</ns0:expan>','',name_str,flags=re.DOTALL)
             else:
                 name_str=name_str
@@ -44,37 +38,35 @@ def iterate_place_person(node):
             lb_str=r'<ns0:lb.*?>'
             lb_result=re.search(lb_str,name_str,flags=re.DOTALL)
             if lb_result!=None:
-                #如果有lb，则用改进过的名字 
+                #if <lb> exists, remove <orig>
                 name_str=re.sub(r'<ns0:orig>.*?</ns0:orig>','',name_str,flags=re.DOTALL)
                               
             else:
-                #如果不含lb，则用原本的名字，即把reg的删掉
+                #if no <lb>, remove <reg> 
                 name_str=re.sub(r'<ns0:reg>.*?</ns0:reg>','',name_str,flags=re.DOTALL)
             
-            #如果有大于一个的空格，即出现了lb情况，则将其替代成一个空格
+            #if <lb>, replace it with space
             space_pattern=r'\s{1,}'
             name_str=re.sub(space_pattern,' ',name_str)
             
-            
-            #接下来针对被嵌套tag分离的str，将他们连接起来
+            #for nested str
             persName=''
             pattern=r'>(.*?)<'
             
             person_result=re.findall(pattern,name_str)
             
-            for i in person_result:  #将被tag分离的名字加起来
+            for i in person_result:  
                 persName=persName+i 
-            #print(persName)
                          
             all_persName.append(persName)
                             
         elif child.tag=='{http://www.tei-c.org/ns/1.0}placeName':              
             place_str = ET.tostring(child, encoding='unicode')
-            #检查是否有sic
+            #check if <sic> exists
             sic_str=r'<ns0:sic.*?>'
             sic_result=re.search(sic_str,place_str,flags=re.DOTALL)
             if sic_result!=None:
-                #如果有sic，则去掉更正过的标注，保留错误de
+                #if <sic> exists, remove <corr>
                 name_str=re.sub(r'<ns0:corr>.*?</ns0:corr>','',place_str,flags=re.DOTALL) 
             else:
                 name_str=place_str
@@ -82,7 +74,7 @@ def iterate_place_person(node):
             expan_str=r'<ns0:expan.*?>'            
             expan_result=re.search(expan_str,name_str,flags=re.DOTALL)
             if expan_result!=None:
-                #如果有扩展的，则去掉扩展，保留原来的缩写
+                #if <expan> exists, remore <expan>
                 name_str=re.sub(r'<ns0:expan>.*?</ns0:expan>','',name_str,flags=re.DOTALL)
             else:
                 name_str=name_str
@@ -90,49 +82,42 @@ def iterate_place_person(node):
             lb_str=r'<ns0:lb.*?>'
             lb_result=re.search(lb_str,name_str,flags=re.DOTALL)
             if lb_result!=None:
-                #如果有lb，则用改进过的名字
+                #if <lb> exists, remove <orig>
                 name_str=re.sub(r'<ns0:orig>.*?</ns0:orig>','',name_str,flags=re.DOTALL)
             else:
-                #如果不含lb，则用原本的名字，即把reg的删掉
-                name_str=re.sub(r'<ns0:reg>.*?</ns0:reg>','',name_str,flags=re.DOTALL)
+                #if no <lb>, remove <reg> 
+                name_str=re.sub(r'<ns0:reg>.*?</ns0:reg>','',name_str,flags=re.DOTALL) 
             
-            
-            #如果有大于一个的空格，即出现了lb情况，则将其替代成一个空格
+            #if <lb>, replace it with space
             space_pattern=r'\s{1,}'
             name_str=re.sub(space_pattern,' ',name_str)
-            
-            
-            #接下来针对被嵌套tag分离的str，将他们连接起来
+                        
+            #for nested str
             placeName=''
             pattern=r'>(.*?)<'
             place_result=re.findall(pattern,name_str)
-            for i in place_result:  #将被tag分离的名字加起来
+            for i in place_result:  
                 placeName=placeName+i 
             all_placeName.append(placeName)
         else:
             iterate_place_person(child)
             
 def transcribe(node):   
-#提取纯文本(原文本，保留所有的换行和原文)
+#extract plain text
     global text
-    #将整个text转为str
     text_str=ET.tostring(node, encoding='unicode')
-    #text_str=re.sub(r'<ns0:note.*?</ns0:note>','',text_str)
-    
     new_str1=re.sub(r'<ns0:expan>.*?</ns0:expan>','',text_str)
     new_str2=re.sub(r'<ns0:reg>.*?</ns0:reg>','',new_str1)
     new_str3=re.sub(r'<.*?>','',new_str2,flags=re.DOTALL)
     new_str4=new_str3.replace('&amp;','&')
     text=new_str4
     
-    
 def match(node):
-#将文本与实体类型对应起来
+    #match the text with entity
     text_str=ET.tostring(node, encoding='unicode')    
-    #去掉note
+    #remove note
     text_str=re.sub(r'<ns0:note.*?</ns0:note>','',text_str)
     
-    #遇到choice,判断sic,org和abbr，之所以要将choice拉出来，因为choice里面会将单词分割
     choice_pattern=r'<ns0:choice.*?</ns0:choice>'
     choice_matches=re.findall(choice_pattern, text_str,flags=re.S)
     
@@ -155,20 +140,16 @@ def match(node):
             all_choice=re.sub(r'<ns0:orig>.*?</ns0:orig>','',all_choice,flags=re.S)
         else:
             all_choice=re.sub(r'<ns0:reg>.*?</ns0:reg>','',all_choice,flags=re.S)
-        #如果有大于一个的空格，即出现了lb情况，则将其替代成一个空格
+       
         space_pattern=r'\s{1,}'
         all_choice=re.sub(space_pattern,' ',all_choice)
-        
-        #接下来将choice里所有被tag阻断的字符连接起来
-        pattern=r'>(.*?)<' #匹配><之间的东西
+
+        pattern=r'>(.*?)<' 
         result=re.findall(pattern,all_choice)
-        #print(result)
         new_result=''
         for letter in result:
             new_result=new_result+letter
-        #print(new_result)
         choice_replace_result.append(new_result)
-    #开始替换全文中的choice
     choice_num=len(choice_replace_result)
     choice_replacements=[]
     choice_index=0
@@ -177,71 +158,35 @@ def match(node):
         choice_index+=1
     for match,replacement in zip(choice_matches, choice_replacements):
         text_str=text_str.replace(match,replacement,1)
-    
-      
-   
-    #接下来是将所有人名tag换成all_persName
+     
+    #all person names change to 'persName' 
     pers_pattern=r'<ns0:persName.*?</ns0:persName>'
     pers_matches=re.findall(pers_pattern,text_str,flags=re.S)
     pers_replacements=[]
     for p in range(len(pers_matches)):
         pers_replacements.append('<ns0:persName>'+'persName'+'</ns0:persName>')
-    #将所有的persName的tag全换掉
     for match, replacement in zip(pers_matches, pers_replacements):
         text_str = text_str.replace(match, replacement, 1)
     
-    #所有地名也
     place_pattern=r'<ns0:placeName.*?</ns0:placeName>'
     place_matches=re.findall(place_pattern,text_str,flags=re.S)
     place_replacements=[]
     for p in range(len(place_matches)):
         place_replacements.append('<ns0:placeName>'+'placeName'+'</ns0:placeName>')
-    #将所有的placeName的tag全换掉
     for match, replacement in zip(place_matches, place_replacements):
         text_str = text_str.replace(match, replacement, 1)
-   
-    
+      
     text_str=text_str.replace('&amp;','&')
-    group_pattern=r'>(.*?)<' #匹配><之间的东西
+    group_pattern=r'>(.*?)<' 
     group_result=re.findall(group_pattern,text_str,flags=re.S)
     
-    
-   
-    #print(match_result)
     new_group=[]
-    #去空值，只把有文本的留下
+    #remove null
     for m in group_result:
         if m!='' and m.isspace() == False:
             new_group.append(m)
-    
-    #print(new_group)  
-    
-    
-    '''
-    #查看placeName前有of的词
-    texts=''
-    for word in new_group:
-        texts=texts+' '+word  
-    space_pattern=r'\s{1,}'
-    texts=re.sub(space_pattern,' ',texts)
-    #print(texts)
-    words=texts.split()
-    #print(words)
+            
     index=0
-    for word in words:
-        if word=='placeName' and words[index-1].strip()=='of':
-            print(words[index-2])
-            print(words[index-1])
-            print(word)
-        index+=1
-    '''    
-    
-      
-
-    
-    
-    index=0
-    #开始造字典
     text_entity={}
     for i in new_group:
         inter=[]
@@ -258,7 +203,6 @@ def match(node):
             inter.append(i)
             inter.append('')
             text_entity[index]=inter
-    #print(text_entity)
     
     pers_index=0
     place_index=0
@@ -270,28 +214,22 @@ def match(node):
             values[0]=all_placeName[place_index]
             place_index+=1
         
-    #print(text_entity)
     return text_entity
  
             
         
 def token():
     text_entity=match(text_node)
-    #print(text_entity)
-    #print(text_entity)
     all_tokens=[]
     all_entity=[]
-    #print(text_entity)
     
     for keys,values in text_entity.items():
         tt=values[0]
         if len(values[0])==0:
             continue
         word=word_tokenize(tt)
-        #print(word)
         
         for w in word:
-           
             all_tokens.append(w)
         
         if values[1]=='IOB-pers':
@@ -314,56 +252,21 @@ def token():
 
     return all_tokens,all_entity
 
-
-
 def write_csv(file):
     all_tokens,all_entity=token()
     print(len(all_tokens),len(all_entity))
     file=file.replace('.xml','.tsv')
     dataframe = pd.DataFrame({'TOKEN':all_tokens,'NE':all_entity})
-    dataframe.to_csv('D:\OneDrive - University College London\Desktop\check\%s'%file,index=False,sep='\t')
+    dataframe.to_csv('../evaluation datasets/Mary Hamilton_new/%s'%file,index=False,sep='\t')
     
-    
-
 if __name__ == "__main__":
-    path='D:\OneDrive - University College London\Desktop\Corpora\MH\XML_files_minus_project-specific_mark-up_20240212'   
+    path='../original datasets/XML_files_minus_project-specific_mark-up_20240212'   
     files= os.listdir(path)
-    '''
-    file='AR-HAM-00001-00001-00001-00013.xml'
-    all_node=[]
-    all_persName=[]
-    all_placeName=[]
-    text_node=read_file(file)
-    iterate_place_person(text_node)
-    print(all_persName)
-    print(all_placeName)
-    write_csv(file)
-    
-    '''
-    for file in files[0:550]:  
-        #print(file)
+    for file in files[0:1598]:  
         all_node=[]
         all_persName=[]
         all_placeName=[]
         text_node=read_file(file)
         iterate_place_person(text_node)
-        
-        match(text_node)
-        
-        #print(all_placeName)
-        for i in all_placeName:
-            if 'Naples' in i:
-                print(file)
-                print(i)
-        
-        
-        #for name in all_placeName:
-            #name_list=name.split()
-            #if len(name_list)>2:
-                #print(file)
-                #print(name)
-                
-        #print(all_placeName)
-        #transcribe(text_node)
-        #write_csv(file)
+        write_csv(file)
     
